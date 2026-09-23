@@ -2,21 +2,28 @@
   <main class="app">
     <section class="controls">
       <h1>BitMapper</h1>
+      <div class="toolbar">
+        <button @click="undo" :disabled="!past.length">Undo</button><button @click="redo" :disabled="!future.length">Redo</button><button @click="clearGrid">Clear</button>
+        <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Open project</button>
+        <button @click="exportPNG">PNG</button><button @click="exportBMP">BMP</button>
+        <input ref="file" type="file" accept=".bitmapper,.json" hidden @change="openProject" />
+      </div>
       <div class="settings">
-        <label>Width <select v-model.number="xRes"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
-        <label>Height <select v-model.number="yRes"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
-        <label>Colour Depth <select v-model.number="colourDepth"><option v-for="n in 3" :key="n">{{ n }}</option></select></label>
-        <label v-if="colourDepth === 3">Colour palette <select v-model="paletteChoice"><option value="default">Rainbow</option><option value="rgb">3bit RGB</option><option value="custom">Custom</option></select></label>
+        <label>Width <select :value="xRes" @change="resize($event, 'width')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
+        <label>Height <select :value="yRes" @change="resize($event, 'height')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
+        <label>Colour Depth <select :value="colourDepth" @change="changeDepth"><option v-for="n in 3" :key="n">{{ n }}</option></select></label>
+        <label v-if="colourDepth === 3">Colour palette <select :value="paletteChoice" @change="checkpoint(); paletteChoice = $event.target.value"><option value="default">Rainbow</option><option value="rgb">3bit RGB</option><option value="custom">Custom</option></select></label>
       </div>
       <h2>Palette</h2>
       <div class="palette">
         <div v-for="(colour, i) in palette" :key="i" class="palette-entry">
           <button class="swatch" :class="{selected: selected === i}" :aria-label="'Paint ' + pattern(i)" :aria-pressed="selected === i" :style="{background: colour, color: contrast(colour)}" @click="selected = i">{{ pattern(i) }}</button>
-          <input v-if="colourDepth === 3 && paletteChoice === 'custom'" type="color" :aria-label="'Colour for ' + pattern(i)" v-model="custom[i]" />
+          <input v-if="colourDepth === 3 && paletteChoice === 'custom'" type="color" :aria-label="'Colour for ' + pattern(i)" :value="custom[i]" @change="checkpoint(); custom[i] = $event.target.value" />
         </div>
       </div>
       <label class="data-label" for="binary">Binary data</label>
-      <textarea id="binary" aria-label="Binary data" rows="8" :value="data" @input="updateData" spellcheck="false" placeholder="0101…"></textarea>
+      <textarea ref="binary" id="binary" aria-label="Binary data" rows="8" :value="data" @input="updateData" @click="selectFromBits" @keyup="selectFromBits" spellcheck="false" placeholder="0101…"></textarea>
+      <div v-if="hasSelection" class="inspector">Pixel {{ cursor % xRes + 1 }}, {{ Math.floor(cursor / xRes) + 1 }} · <mark>{{ pattern(valueAt(cursor)) }}</mark> = {{ valueAt(cursor) }} <button @click="highlightBits(true)">Show bits</button></div>
       <p v-if="warning" class="warning" role="status">{{ warning }}</p>
     </section>
     <section ref="editor" class="editor">
@@ -24,6 +31,14 @@
         <ToggleSwitch labelText="Labels" leftText="Show" rightText="Hide" v-model:state="showLabels" />
         <ToggleSwitch labelText="Grid Lines" leftText="Show" rightText="Hide" v-model:state="showGridlines" />
         <label>Zoom <select v-model.number="zoom"><option :value="1">Fit</option><option :value="2">2×</option><option :value="4">4×</option><option :value="8">8×</option></select></label>
+        <label>Tool <select v-model="tool"><option value="paint">Paint</option><option value="inspect">Inspect</option></select></label>
+        <label><input type="checkbox" v-model="learn" /> Learn</label>
+      </div>
+      <div v-if="learn" class="learn-panel">
+        <strong>{{ xRes }} × {{ yRes }} = {{ xRes * yRes }} pixels</strong>
+        <span>{{ colourDepth }} bits/pixel · {{ 2 ** colourDepth }} colours</span>
+        <span>{{ xRes * yRes }} × {{ colourDepth }} = {{ capacity.toLocaleString() }} bits = {{ capacity / 8 }} bytes</span>
+        <small>Pixel data only; whole-byte storage: {{ Math.ceil(capacity / 8).toLocaleString() }} bytes. File headers and palettes add overhead.</small>
       </div>
       <div class="viewport" :class="{ zoomed: zoom > 1 }" :style="{ width: canvasWidth + 'px' }">
         <canvas ref="canvas" :style="{width: canvasWidth + 'px', height: canvasHeight + 'px'}" tabindex="0" role="img" :aria-label="'Editable ' + xRes + ' by ' + yRes + ' pixel grid. Arrow keys move; Space or Enter paints.'" @pointerdown="startPaint" @pointermove="movePaint" @pointerup="stopPaint" @pointercancel="stopPaint" @lostpointercapture="stopPaint" @keydown="keyPaint" @focus="focused = true; draw()" @blur="focused = false; draw()"></canvas>
@@ -35,6 +50,7 @@
 
 <script>
 import ToggleSwitch from './components/ToggleSwitch.vue';
+import { validateProject, resizeBits, bmpBytes } from './project.mjs';
 export default {
   components: { ToggleSwitch },
   data() {
@@ -44,6 +60,7 @@ export default {
       custom: ['#000000','#0000ff','#00ff00','#00ffff','#ff0000','#ff00ff','#ffff00','#ffffff'],
       showLabels: true, showGridlines: true, zoom: 1, available: 560,
       painting: false, lastPixel: null, cursor: 0, focused: false,
+      past: [], future: [], tool: 'paint', learn: false, hasSelection: false,
     };
   },
   computed: {
@@ -68,16 +85,53 @@ export default {
     canvasWidth() { this.$nextTick(this.draw); }, canvasHeight() { this.$nextTick(this.draw); },
   },
   mounted() {
+    window.addEventListener('keydown', this.historyKey);
     this.observer = new ResizeObserver(([entry]) => { this.available = Math.max(1, entry.contentRect.width); });
     this.observer.observe(this.$refs.editor);
     this.draw();
   },
-  beforeUnmount() { this.observer.disconnect(); cancelAnimationFrame(this.frame); },
+  beforeUnmount() { this.observer.disconnect(); cancelAnimationFrame(this.frame); window.removeEventListener('keydown', this.historyKey); },
   methods: {
+    snapshot() { return {format:'BitMapper',version:1,width:this.xRes,height:this.yRes,depth:this.colourDepth,palette:this.paletteChoice,custom:[...this.custom],bits:this.data}; },
+    checkpoint() { this.past.push(this.snapshot()); if(this.past.length > 100) this.past.shift(); this.future = []; },
+    restore(p) { this.xRes=p.width; this.yRes=p.height; this.colourDepth=p.depth; this.paletteChoice=p.palette; this.custom=[...p.custom]; this.data=p.bits; this.warning=''; this.hasSelection=false; this.draw(); },
+    undo() { if(!this.past.length) return; this.future.push(this.snapshot()); this.restore(this.past.pop()); },
+    redo() { if(!this.future.length) return; this.past.push(this.snapshot()); this.restore(this.future.pop()); },
+    historyKey(e) { if(!(e.ctrlKey || e.metaKey) || !['z','y'].includes(e.key.toLowerCase())) return; e.preventDefault(); if(e.key.toLowerCase()==='y' || e.shiftKey) this.redo(); else this.undo(); },
+    clearGrid() { if(!this.data) return; if(!window.confirm('Clear this bitmap? You can undo this.')) return; this.checkpoint(); this.data=''; this.hasSelection=false; },
+    resize(event, axis) {
+      const width=axis==='width'?Number(event.target.value):this.xRes, height=axis==='height'?Number(event.target.value):this.yRes;
+      if((width<this.xRes || height<this.yRes) && !window.confirm('Crop to '+width+' × '+height+'? Pixels outside this area will be removed. You can undo this.')) { event.target.value=axis==='width'?this.xRes:this.yRes; return; }
+      const bits=resizeBits(this.data,this.xRes,this.yRes,width,height,this.colourDepth);
+      this.checkpoint(); this.xRes=width; this.yRes=height; this.data=bits; this.hasSelection=false;
+    },
+    changeDepth(event) {
+      const depth=Number(event.target.value), limit=2**depth;
+      const values=Array.from({length:this.xRes*this.yRes},(_,i)=>this.valueAt(i));
+      if(values.some(v=>v>=limit) && !window.confirm('Some colours cannot fit this depth and will become colour 0. Continue? You can undo this.')) { event.target.value=this.colourDepth; return; }
+      this.checkpoint(); this.colourDepth=depth; this.data=values.map(v=>(v<limit?v:0).toString(2).padStart(depth,'0')).join(''); this.hasSelection=false;
+    },
+    highlightBits(focus=false) { this.$nextTick(()=>{ const input=this.$refs.binary; if(focus) input.focus({preventScroll:true}); input.setSelectionRange(this.cursor*this.colourDepth,Math.min(this.data.length,(this.cursor+1)*this.colourDepth)); }); },
+    selectFromBits() { this.cursor=Math.min(this.xRes*this.yRes-1,Math.floor(this.$refs.binary.selectionStart/this.colourDepth)); this.hasSelection=true; this.draw(); },
+    download(blob, extension) { const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download='bitmap-'+this.xRes+'x'+this.yRes+extension; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); },
+    saveProject() { this.download(new Blob([JSON.stringify(this.snapshot(),null,2)],{type:'application/json'}),'.bitmapper'); },
+    async openProject(event) {
+      const file=event.target.files[0]; if(!file) return;
+      try { if(file.size>200000) throw new Error('Project file is too large.'); const p=validateProject(JSON.parse(await file.text())); if(this.data && !window.confirm('Replace this bitmap with the opened project? You can undo this.')) return; this.checkpoint(); this.restore(p); }
+      catch(error) { this.warning=error instanceof SyntaxError?'Invalid BitMapper project file.':error.message; }
+      finally { event.target.value=''; }
+    },
+    exportPNG() {
+      const canvas=document.createElement('canvas'); canvas.width=this.xRes; canvas.height=this.yRes; const ctx=canvas.getContext('2d');
+      for(let i=0;i<this.xRes*this.yRes;i++) { ctx.fillStyle=this.palette[this.valueAt(i)]; ctx.fillRect(i%this.xRes,Math.floor(i/this.xRes),1,1); }
+      canvas.toBlob(blob=>{ if(blob) this.download(blob,'.png'); },'image/png');
+    },
+    exportBMP() { const colours=Array.from({length:this.xRes*this.yRes},(_,i)=>this.palette[this.valueAt(i)]); this.download(new Blob([bmpBytes(this.xRes,this.yRes,colours)],{type:'image/bmp'}),'.bmp'); },
     pattern(value) { return value.toString(2).padStart(this.colourDepth, '0'); },
     valueAt(index) { return parseInt(this.data.slice(index * this.colourDepth, (index + 1) * this.colourDepth).padEnd(this.colourDepth, '0'), 2); },
     contrast(hex) { return (parseInt(hex.slice(1,3),16)*299 + parseInt(hex.slice(3,5),16)*587 + parseInt(hex.slice(5,7),16)*114) / 1000 > 150 ? '#17202b' : '#ffffff'; },
     updateData(event) {
+      this.checkpoint(); this.hasSelection=false;
       const raw = event.target.value, binary = raw.replace(/[^01]/g, '');
       this.warning = raw !== binary ? 'Only 0 and 1 are kept.' : binary.length > this.capacity ? 'Grid capacity reached.' : '';
       this.data = binary.slice(0, this.capacity); event.target.value = this.data;
@@ -93,9 +147,13 @@ export default {
       const padded = this.data.padEnd(start + this.colourDepth, '0');
       this.data = padded.slice(0, start) + this.pattern(this.selected) + padded.slice(start + this.colourDepth);
       this.cursor = index; this.warning = ''; this.draw();
+      this.hasSelection=true; this.highlightBits();
     },
     startPaint(event) {
       if (event.button !== 0) return;
+      const pixel=this.pixelAt(event); if(pixel===null) return;
+      if(this.tool==='inspect') { this.cursor=pixel; this.hasSelection=true; this.highlightBits(true); this.draw(); return; }
+      this.checkpoint();
       this.$refs.canvas.focus(); this.$refs.canvas.setPointerCapture(event.pointerId);
       this.painting = true; this.lastPixel = this.pixelAt(event);
       if (this.lastPixel !== null) this.paint(this.lastPixel);
@@ -120,7 +178,8 @@ export default {
       if (event.key === 'ArrowRight' && x < this.xRes - 1) this.cursor++;
       if (event.key === 'ArrowUp' && y > 0) this.cursor -= this.xRes;
       if (event.key === 'ArrowDown' && y < this.yRes - 1) this.cursor += this.xRes;
-      if (event.key === ' ' || event.key === 'Enter') this.paint(this.cursor);
+      if (event.key === ' ' || event.key === 'Enter') { if(this.tool==='paint') { this.checkpoint(); this.paint(this.cursor); } }
+      this.hasSelection=true; this.highlightBits();
       this.draw();
     },
     draw() {
@@ -147,7 +206,7 @@ export default {
         for (let y = 0; y <= this.yRes; y++) { ctx.moveTo(0, y * size); ctx.lineTo(this.canvasWidth, y * size); }
         ctx.stroke();
       }
-      if (this.focused) {
+      if (this.focused || this.hasSelection) {
         ctx.strokeStyle = '#00bfff'; ctx.lineWidth = 2;
         ctx.strokeRect(this.cursor % this.xRes * size + 1, Math.floor(this.cursor / this.xRes) * size + 1, Math.max(1,size-2), Math.max(1,size-2));
       }
@@ -172,5 +231,13 @@ h1 { margin: 0 0 24px; font-size: 32px; } h2 { margin-top: 24px; font-size: 17px
 .viewport.zoomed { max-height: 75vh; }
 canvas { display: block; touch-action: none; cursor: crosshair; } canvas:focus-visible { outline: 2px solid #2469b2; outline-offset: -2px; }
 .signature { text-align: right; font-size: 12px; margin-top: 24px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.toolbar button, .inspector button { font: inherit; font-size: 12px; border: 1px solid #a3aeb8; background: #fff; border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+button:disabled { opacity: 0.4; cursor: default; }
+.inspector { margin-top: 10px; font-size: 12px; line-height: 2; }
+.inspector mark { background: #c7e8ff; padding: 3px; }
+.learn-panel { display: grid; gap: 8px; padding: 14px; margin-bottom: 16px; background: #f3f8ff; border-radius: 8px; font-size: 14px; }
+.learn-panel small { line-height: 1.5; }
 @media (max-width: 760px) { .app { grid-template-columns: 1fr; padding: 18px; margin: 12px; gap: 20px; } .viewport.zoomed { max-height: 65vh; } }
 </style>
+
