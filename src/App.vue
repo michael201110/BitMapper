@@ -8,20 +8,16 @@
         <label>Colour Depth <select v-model.number="colourDepth"><option v-for="n in 3" :key="n">{{ n }}</option></select></label>
         <label v-if="colourDepth === 3">Colour palette <select v-model="paletteChoice"><option value="default">Rainbow</option><option value="rgb">3bit RGB</option><option value="custom">Custom</option></select></label>
       </div>
-      <h2>Paint colour</h2>
-      <p class="hint">Choose a colour, then click or drag across the pixels.</p>
+      <h2>Palette</h2>
       <div class="palette">
         <div v-for="(colour, i) in palette" :key="i" class="palette-entry">
           <button class="swatch" :class="{selected: selected === i}" :aria-label="'Paint ' + pattern(i)" :aria-pressed="selected === i" :style="{background: colour, color: contrast(colour)}" @click="selected = i">{{ pattern(i) }}</button>
           <input v-if="colourDepth === 3 && paletteChoice === 'custom'" type="color" :aria-label="'Colour for ' + pattern(i)" v-model="custom[i]" />
         </div>
       </div>
-      <p>Selected: <strong>{{ pattern(selected) }}</strong></p>
       <label class="data-label" for="binary">Binary data</label>
-      <textarea id="binary" aria-label="Binary data" rows="8" :value="data" @input="updateData" spellcheck="false" placeholder="Type or paste bits, or paint on the grid"></textarea>
-      <p class="hint">{{ data.length.toLocaleString() }} / {{ capacity.toLocaleString() }} bits · {{ colourDepth }} bits per pixel</p>
-      <p class="warning" role="status">{{ warning }}</p>
-      <p class="hint">Empty pixels use {{ pattern(0) }}. Incomplete bit groups are padded with zeros in the preview. Painting fills preceding empty pixels with zeros.</p>
+      <textarea id="binary" aria-label="Binary data" rows="8" :value="data" @input="updateData" spellcheck="false" placeholder="0101…"></textarea>
+      <p v-if="warning" class="warning" role="status">{{ warning }}</p>
     </section>
     <section ref="editor" class="editor">
       <div class="display-controls">
@@ -29,11 +25,9 @@
         <ToggleSwitch labelText="Grid Lines" leftText="Show" rightText="Hide" v-model:state="showGridlines" />
         <label>Zoom <select v-model.number="zoom"><option :value="1">Fit</option><option :value="2">2×</option><option :value="4">4×</option><option :value="8">8×</option></select></label>
       </div>
-      <div class="viewport" :style="{ width: canvasWidth + 'px' }">
+      <div class="viewport" :class="{ zoomed: zoom > 1 }" :style="{ width: canvasWidth + 'px' }">
         <canvas ref="canvas" :style="{width: canvasWidth + 'px', height: canvasHeight + 'px'}" tabindex="0" role="img" :aria-label="'Editable ' + xRes + ' by ' + yRes + ' pixel grid. Arrow keys move; Space or Enter paints.'" @pointerdown="startPaint" @pointermove="movePaint" @pointerup="stopPaint" @pointercancel="stopPaint" @lostpointercapture="stopPaint" @keydown="keyPaint" @focus="focused = true; draw()" @blur="focused = false; draw()"></canvas>
       </div>
-      <p class="hint">{{ xRes }} × {{ yRes }} pixels · Zoom in for precise editing. Labels appear when pixels are large enough.</p>
-      <p class="hint">Keyboard: arrow keys move; Space or Enter paints. Current pixel: {{ cursor % xRes + 1 }}, {{ Math.floor(cursor / xRes) + 1 }} · {{ pattern(valueAt(cursor)) }}</p>
       <p class="signature">Version 2.1 by michael201110</p>
     </section>
   </main>
@@ -61,7 +55,7 @@ export default {
       if (this.paletteChoice === 'rgb') return ['#000000','#0000ff','#00ff00','#00ffff','#ff0000','#ff00ff','#ffff00','#ffffff'];
       return ['#000000','#ff0000','#ff8c00','#ffd700','#00ff00','#0000ff','#4b0082','#ffffff'];
     },
-    cellSize() { return Math.min(this.available / this.xRes, 560 / this.yRes) * this.zoom; },
+    cellSize() { return this.available / this.xRes * this.zoom; },
     canvasWidth() { return this.cellSize * this.xRes; },
     canvasHeight() { return this.cellSize * this.yRes; },
   },
@@ -135,7 +129,7 @@ export default {
     },
     drawFrame() {
       const canvas = this.$refs.canvas; if (!canvas) return;
-      const ratio = window.devicePixelRatio || 1, size = this.cellSize;
+      const ratio = Math.min(window.devicePixelRatio || 1, 8192 / Math.max(this.canvasWidth, this.canvasHeight)), size = this.cellSize;
       canvas.width = Math.round(this.canvasWidth * ratio); canvas.height = Math.round(this.canvasHeight * ratio);
       const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
       for (let i = 0; i < this.xRes * this.yRes; i++) {
@@ -168,14 +162,15 @@ body { margin: 0; background: #f5f6f8; color: #25394b; font-family: Consolas, mo
 .app { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 28px; max-width: 1100px; margin: 32px auto; padding: 28px; background: #e5e5e5; border-radius: 12px; box-shadow: 0 8px 24px #0002; }
 h1 { margin: 0 0 24px; font-size: 32px; } h2 { margin-top: 24px; font-size: 17px; }
 .settings { display: flex; flex-wrap: wrap; gap: 14px; } label { font-size: 14px; } select { padding: 5px; border-radius: 4px; }
-.hint { font-size: 12px; line-height: 1.6; color: #53616d; } .palette { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.hint { font-size: 12px; line-height: 1.6; color: #53616d; } .palette { margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .palette-entry { display: grid; gap: 6px; } .swatch { min-height: 46px; border: 2px solid #89929b; border-radius: 7px; cursor: pointer; font-family: inherit; }
 .swatch.selected { outline: 3px solid #2469b2; outline-offset: 2px; } .palette input { width: 100%; height: 30px; }
 .data-label { display: block; margin-bottom: 8px; } textarea { width: 100%; resize: vertical; font-family: inherit; padding: 10px; overflow-wrap: anywhere; }
 .warning { color: #a12c14; font-size: 12px; min-height: 16px; } .editor { min-width: 0; }
 .display-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 20px; }
-.viewport { max-width: 100%; overflow: auto; max-height: 650px; background: #cdd2d8; }
+.viewport { max-width: 100%; overflow: auto; background: #cdd2d8; }
+.viewport.zoomed { max-height: 75vh; }
 canvas { display: block; touch-action: none; cursor: crosshair; } canvas:focus-visible { outline: 2px solid #2469b2; outline-offset: -2px; }
 .signature { text-align: right; font-size: 12px; margin-top: 24px; }
-@media (max-width: 760px) { .app { grid-template-columns: 1fr; padding: 18px; margin: 12px; gap: 20px; } .viewport { max-height: 65vh; } }
+@media (max-width: 760px) { .app { grid-template-columns: 1fr; padding: 18px; margin: 12px; gap: 20px; } .viewport.zoomed { max-height: 65vh; } }
 </style>
