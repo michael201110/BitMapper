@@ -86,3 +86,7 @@ To reproduce the deployment locally, run `npm ci` followed by `npm run build`.
 ## Pixel editing
 
 Select a paint colour by its bit pattern, then click or drag on the grid. Custom palette colour pickers change the colour for that bit pattern everywhere. Empty pixels are zero; painting beyond the current input fills the gap with zeros. Incomplete bit groups are padded on the right in the preview. Changing dimensions or colour depth reinterprets the row-major bit stream and truncates it if the new capacity is smaller. Labels appear only when cells are large enough; zoom in to read them.
+
+### Sharing and image conversion
+
+Save a .bitmapper project to reopen it with its exact grid, depth, palette, and data. PNG and BMP exports can be imported again. The image importer also accepts other browser-readable formats such as JPEG and WebP; it scales them to the selected grid and maps each pixel to the nearest active palette colour. Transparent areas are composited onto white.

@@ -4,9 +4,10 @@
       <h1>BitMapper</h1>
       <div class="toolbar">
         <button @click="undo" :disabled="!past.length">Undo</button><button @click="redo" :disabled="!future.length">Redo</button><button @click="clearGrid">Clear</button>
-        <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Open project</button>
+        <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Open project</button><button @click="$refs.image.click()">Import image</button>
         <button @click="exportPNG">PNG</button><button @click="exportBMP">BMP</button>
         <input ref="file" type="file" accept=".bitmapper,.json" hidden @change="openProject" />
+        <input ref="image" type="file" accept="image/*" hidden @change="importImage" />
       </div>
       <div class="settings">
         <label>Width <select :value="xRes" @change="resize($event, 'width')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
@@ -120,6 +121,30 @@ export default {
       try { if(file.size>200000) throw new Error('Project file is too large.'); const p=validateProject(JSON.parse(await file.text())); if(this.data && !window.confirm('Replace this bitmap with the opened project? You can undo this.')) return; this.checkpoint(); this.restore(p); }
       catch(error) { this.warning=error instanceof SyntaxError?'Invalid BitMapper project file.':error.message; }
       finally { event.target.value=''; }
+    },
+    async importImage(event) {
+      const file=event.target.files[0]; if(!file) return;
+      try {
+        if(file.size>10000000) throw new Error('Image file is too large.');
+        if(this.data && !window.confirm('Replace this bitmap with the imported image? You can undo this.')) return;
+        const image=await createImageBitmap(file);
+        const width=this.resolutions.includes(image.width)?image.width:this.xRes;
+        const height=this.resolutions.includes(image.height)?image.height:this.yRes;
+        const source=document.createElement('canvas'); source.width=width; source.height=height;
+        const context=source.getContext('2d',{willReadFrequently:true}); context.imageSmoothingEnabled=true; context.fillStyle='#ffffff'; context.fillRect(0,0,width,height); context.drawImage(image,0,0,width,height);
+        const pixels=context.getImageData(0,0,width,height).data, bits=[];
+        for(let i=0;i<width*height;i++) {
+          const offset=i*4, value=this.closestPaletteValue(pixels[offset],pixels[offset+1],pixels[offset+2]);
+          bits.push(value.toString(2).padStart(this.colourDepth,'0'));
+        }
+        image.close(); this.checkpoint(); this.xRes=width; this.yRes=height; this.data=bits.join(''); this.hasSelection=false; this.warning='';
+      } catch(error) { this.warning=error.message || 'Could not import that image.'; }
+      finally { event.target.value=''; }
+    },
+    closestPaletteValue(red,green,blue) {
+      let closest=0, distance=Infinity;
+      this.palette.forEach((hex,index)=>{ const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); const d=(red-r)**2+(green-g)**2+(blue-b)**2; if(d<distance){distance=d;closest=index;} });
+      return closest;
     },
     exportPNG() {
       const canvas=document.createElement('canvas'); canvas.width=this.xRes; canvas.height=this.yRes; const ctx=canvas.getContext('2d');
