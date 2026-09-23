@@ -3,27 +3,26 @@
     <section class="controls">
       <h1>BitMapper</h1>
       <div class="toolbar">
-        <button @click="undo" :disabled="!past.length">Undo</button><button @click="redo" :disabled="!future.length">Redo</button><button @click="clearGrid">Clear</button>
-        <div class="file-row">
+        <fieldset class="control-group"><legend>Edit</legend><div class="group-actions"><button @click="undo" :disabled="!past.length">Undo</button><button @click="redo" :disabled="!future.length">Redo</button><button @click="clearGrid">Clear</button></div></fieldset>
+        <fieldset class="control-group file-group"><legend>Files</legend><div class="group-actions">
           <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Import</button><button @click="$refs.image.click()">Import image</button>
           <details class="export-menu"><summary>Export</summary><div class="export-options"><button @click="exportPNG">PNG</button><button @click="exportBMP">BMP</button></div></details>
-        </div>
+        </div></fieldset>
         <input ref="file" type="file" accept=".bitmapper,.json" hidden @change="openProject" />
         <input ref="image" type="file" accept="image/*" hidden @change="importImage" />
       </div>
-      <div class="settings">
+      <fieldset class="settings"><legend>Grid</legend>
         <label>Width <select :value="xRes" @change="resize($event, 'width')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
         <label>Height <select :value="yRes" @change="resize($event, 'height')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
         <label>Colour Depth <select :value="colourDepth" @change="changeDepth"><option v-for="n in 3" :key="n">{{ n }}</option></select></label>
         <label v-if="colourDepth === 3">Colour palette <select :value="paletteChoice" @change="checkpoint(); paletteChoice = $event.target.value"><option value="default">Rainbow</option><option value="rgb">3bit RGB</option><option value="custom">Custom</option></select></label>
-      </div>
-      <h2>Palette</h2>
-      <div class="palette">
+      </fieldset>
+      <fieldset class="palette-group"><legend>Palette</legend><div class="palette">
         <div v-for="(colour, i) in palette" :key="i" class="palette-entry">
           <button class="swatch" :class="{selected: selected === i}" :aria-label="'Paint ' + pattern(i)" :aria-pressed="selected === i" :style="{background: colour, color: contrast(colour)}" @click="selected = i">{{ pattern(i) }}</button>
           <input v-if="colourDepth === 3 && paletteChoice === 'custom'" type="color" :aria-label="'Colour for ' + pattern(i)" :value="custom[i]" @change="checkpoint(); custom[i] = $event.target.value" />
         </div>
-      </div>
+      </div></fieldset>
       <label class="data-label" for="binary">Binary data</label>
       <textarea ref="binary" id="binary" aria-label="Binary data" rows="8" :value="data" @input="updateData" @click="selectFromBits" @keyup="selectFromBits" spellcheck="false" placeholder="0101…"></textarea>
       <div v-if="hasSelection" class="inspector">Pixel {{ cursor % xRes + 1 }}, {{ Math.floor(cursor / xRes) + 1 }} · <mark>{{ pattern(valueAt(cursor)) }}</mark> = {{ valueAt(cursor) }} <button @click="highlightBits(true)">Show bits</button></div>
@@ -246,8 +245,11 @@ export default {
 * { box-sizing: border-box; }
 body { margin: 0; background: #f5f6f8; color: #25394b; font-family: Consolas, monospace; }
 .app { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 28px; max-width: 1100px; margin: 32px auto; padding: 28px; background: #e5e5e5; border-radius: 12px; box-shadow: 0 8px 24px #0002; }
-h1 { margin: 0 0 24px; font-size: 32px; } h2 { margin-top: 24px; font-size: 17px; }
-.settings { display: flex; flex-wrap: wrap; gap: 14px; } label { font-size: 14px; } select { padding: 5px; border-radius: 4px; }
+h1 { margin: 0 0 24px; font-size: 32px; } label { font-size: 14px; } select { padding: 5px; border-radius: 4px; }
+.control-group, .settings, .palette-group { min-width: 0; margin: 0 0 14px; padding: 10px; border: 1px solid #b8c1c9; border-radius: 8px; }
+.control-group legend, .settings legend, .palette-group legend { padding: 0 6px; font-size: 12px; color: #53616d; }
+.group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.settings { display: flex; flex-wrap: wrap; gap: 12px; }
 .hint { font-size: 12px; line-height: 1.6; color: #53616d; } .palette { margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .palette-entry { display: grid; gap: 6px; } .swatch { min-height: 46px; border: 2px solid #89929b; border-radius: 7px; cursor: pointer; font-family: inherit; }
 .swatch.selected { outline: 3px solid #2469b2; outline-offset: 2px; } .palette input { width: 100%; height: 30px; }
@@ -258,9 +260,8 @@ h1 { margin: 0 0 24px; font-size: 32px; } h2 { margin-top: 24px; font-size: 17px
 .viewport.zoomed { max-height: 75vh; }
 canvas { display: block; touch-action: none; cursor: crosshair; } canvas:focus-visible { outline: 2px solid #2469b2; outline-offset: -2px; }
 .signature { text-align: right; font-size: 12px; margin-top: 24px; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.toolbar button, .inspector button, .export-menu summary { font: inherit; font-size: 12px; border: 1px solid #a3aeb8; background: #fff; border-radius: 5px; padding: 7px 10px; cursor: pointer; }
-.file-row { flex-basis: 100%; display: flex; align-items: flex-start; gap: 8px; }
+.toolbar { margin-bottom: 6px; }
+.toolbar button, .inspector button, .export-menu summary { font: inherit; font-size: 12px; border: 1px solid #a3aeb8; background: #fff; border-radius: 5px; padding: 7px 10px; cursor: pointer; white-space: nowrap; }
 .export-menu { position: relative; }
 .export-menu summary { list-style: none; }
 .export-menu summary::-webkit-details-marker { display: none; }
