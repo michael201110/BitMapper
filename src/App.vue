@@ -5,11 +5,10 @@
       <div class="toolbar">
         <fieldset class="control-group"><legend>Edit</legend><div class="group-actions"><button @click="undo" :disabled="!past.length">Undo</button><button @click="redo" :disabled="!future.length">Redo</button><button @click="clearGrid">Clear</button></div></fieldset>
         <fieldset class="control-group file-group"><legend>Files</legend><div class="group-actions">
-          <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Import</button><button @click="$refs.image.click()">Import image</button>
+          <button @click="saveProject">Save project</button><button @click="$refs.importFile.click()">Import</button>
           <details class="export-menu"><summary>Export</summary><div class="export-options"><button @click="exportPNG">PNG</button><button @click="exportBMP">BMP</button></div></details>
         </div></fieldset>
-        <input ref="file" type="file" accept=".bitmapper,.json" hidden @change="openProject" />
-        <input ref="image" type="file" accept="image/*" hidden @change="importImage" />
+        <input ref="importFile" type="file" accept=".bitmapper,.json,image/*" hidden @change="handleImport" />
       </div>
       <fieldset class="settings"><legend>Grid</legend>
         <label>Width <select :value="xRes" @change="resize($event, 'width')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
@@ -117,14 +116,18 @@ export default {
     selectFromBits() { this.cursor=Math.min(this.xRes*this.yRes-1,Math.floor(this.$refs.binary.selectionStart/this.colourDepth)); this.hasSelection=true; this.draw(); },
     download(blob, extension) { const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download='bitmap-'+this.xRes+'x'+this.yRes+extension; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); },
     saveProject() { this.download(new Blob([JSON.stringify(this.snapshot(),null,2)],{type:'application/json'}),'.bitmapper'); },
-    async openProject(event) {
+    async handleImport(event) {
       const file=event.target.files[0]; if(!file) return;
-      try { if(file.size>200000) throw new Error('Project file is too large.'); const p=validateProject(JSON.parse(await file.text())); if(this.data && !window.confirm('Replace this bitmap with the opened project? You can undo this.')) return; this.checkpoint(); this.restore(p); }
-      catch(error) { this.warning=error instanceof SyntaxError?'Invalid BitMapper project file.':error.message; }
+      const isImage=file.type.startsWith('image/') || /\.(png|bmp|jpe?g|webp|gif|svg)$/i.test(file.name);
+      try { if(isImage) await this.importImageFile(file); else await this.openProjectFile(file); }
+      catch(error) { this.warning=error.message || 'Could not import that file.'; }
       finally { event.target.value=''; }
     },
-    async importImage(event) {
-      const file=event.target.files[0]; if(!file) return;
+    async openProjectFile(file) {
+      try { if(file.size>200000) throw new Error('Project file is too large.'); const p=validateProject(JSON.parse(await file.text())); if(this.data && !window.confirm('Replace this bitmap with the opened project? You can undo this.')) return; this.checkpoint(); this.restore(p); }
+      catch(error) { this.warning=error instanceof SyntaxError?'Invalid BitMapper project file.':error.message; }
+    },
+    async importImageFile(file) {
       try {
         if(file.size>10000000) throw new Error('Image file is too large.');
         if(this.data && !window.confirm('Replace this bitmap with the imported image? You can undo this.')) return;
@@ -140,7 +143,6 @@ export default {
         }
         image.close(); this.checkpoint(); this.xRes=width; this.yRes=height; this.data=bits.join(''); this.hasSelection=false; this.warning='';
       } catch(error) { this.warning=error.message || 'Could not import that image.'; }
-      finally { event.target.value=''; }
     },
     closestPaletteValue(red,green,blue) {
       let closest=0, distance=Infinity;
