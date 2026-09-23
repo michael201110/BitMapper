@@ -72,3 +72,11 @@ src/
 ## License
 
 No license has been specified yet.
+
+## GitHub Pages
+
+Live app: https://michael201110.github.io/BitMapper/
+
+Pushes to `main` automatically build and deploy through `.github/workflows/pages.yml`.
+The Vite base path is `/BitMapper/`, matching the repository URL.
+To reproduce the deployment locally, run `npm ci` followed by `npm run build`.

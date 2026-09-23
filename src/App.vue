@@ -60,9 +60,9 @@
 
       <span v-show="enableHidden">Colour Depth: 3</span>
 
-      <label v-show="enableHidden">
+      <label v-show="colourDepth === 3">
 
-        Colour pallet:
+        Colour palette:
 
         <select v-model="palletChoice" @change="sliceData">
 
@@ -176,15 +176,11 @@
 
           cols="35"
 
-          v-model="data"
+          :value="data" aria-label="Binary data"
 
           placeholder="Type binary data here"
 
-          @keypress="checkBinary"
-
-          @change="sliceData"
-
-          @keyup="sliceData"
+          @input="updateData"
 
         ></textarea>
 
@@ -382,28 +378,14 @@ export default {
 
   methods: {
 
-    checkBinary(e) {
-
-      if (this.data.length >= this.fileSize) {
-
-        this.showWarning = "Max length reached";
-
-        this.data = this.data.slice(0, this.fileSize);
-
-        e.preventDefault();
-
-      } else if (!(e.key === "0" || e.key === "1")) {
-
-        this.showWarning = "Only accepts 0 or 1";
-
-        e.preventDefault();
-
-      } else {
-
-        this.showWarning = "";
-
-      }
-
+    updateData(event) {
+      const raw = event.target.value;
+      const binary = raw.replace(/[^01]/g, "");
+      this.showWarning = binary !== raw ? "Only accepts 0 or 1" :
+        binary.length > this.fileSize ? "Max length reached" : "";
+      this.data = binary.slice(0, this.fileSize);
+      event.target.value = this.data;
+      this.sliceData();
     },
 
     sliceData() {
@@ -499,21 +481,13 @@ export default {
   },
 
   watch: {
-
-    data(newVal, oldVal) {
-
-      if (/^$|([01]+$)/.test(newVal) && newVal.length <= this.xRes * this.yRes * this.colourDepth) {
-
-        this.data = newVal;
-
-      } else {
-
-        this.data = oldVal;
-
-      }
-
+    fileSize() {
+      this.data = this.data.slice(0, this.fileSize);
+      this.sliceData();
     },
-
+    colourDepth() {
+      this.sliceData();
+    },
   },
 
   computed: {
@@ -600,13 +574,13 @@ export default {
 
 }
 
-.left {
+.app > .left {
 
   width: 400px;
 
 }
 
-.right {
+.app > .right {
 
   width: 400px;
 
@@ -676,5 +650,12 @@ textarea {
 
 }
 
+@media (max-width: 840px) {
+  .app { width: 100%; max-width: 420px; flex-direction: column; margin-top: 16px; padding: 16px 0; }
+  .app > .column { width: 100%; }
+  textarea { box-sizing: border-box; max-width: calc(100% - 24px); }
+  .bitmap { max-width: 100%; }
+  .bitmap .pixel { max-width: calc((100vw - 32px) / 8); }
+}
 </style>
 
