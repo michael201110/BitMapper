@@ -190,7 +190,7 @@
 
     <div class="column right">
 
-      <div>
+      <div class="display-controls">
 
         <ToggleSwitch
 
@@ -246,7 +246,7 @@
 
       </div>
 
-      <p class="signiture" @click.alt="ActivateHidden">Version 1.1 By Mr C</p>
+      <p class="signiture" @click.alt="ActivateHidden">Version 2.1 by michael201110</p>
 
     </div>
 
@@ -567,6 +567,8 @@ export default {
   justify-content: center;
 
 }
+
+.display-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 20px; padding: 12px; }
 
 .bitmap {
 
