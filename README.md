@@ -4,12 +4,14 @@ BitMapper is a small Vue app for visualizing binary data as a pixel grid. Choose
 
 ## Features
 
-- Grid resolutions from `4x4` through `8x8`
+- Independent width and height: 4, 5, 6, 7, 8, 16, 32, 64, or 128 pixels
 - 1-bit, 2-bit, and 3-bit color depths
 - Rainbow, 3-bit RGB, and custom palettes
 - Optional pixel labels and grid lines
 - Custom colors for every 3-bit palette entry
-- Hidden `16x16` mode, activated with `Alt`-click on the version label
+- Click or drag to paint with any palette colour; binary data stays in sync
+- Fit view and 2×, 4×, and 8× zoom with scrolling for detailed editing
+- Keyboard editing: arrow keys move the cursor; Space or Enter paints
 
 ## Requirements
 
@@ -80,3 +82,7 @@ Live app: https://michael201110.github.io/BitMapper/
 Pushes to `main` automatically build and deploy through `.github/workflows/pages.yml`.
 The Vite base path is `/BitMapper/`, matching the repository URL.
 To reproduce the deployment locally, run `npm ci` followed by `npm run build`.
+
+## Pixel editing
+
+Select a paint colour by its bit pattern, then click or drag on the grid. Custom palette colour pickers change the colour for that bit pattern everywhere. Empty pixels are zero; painting beyond the current input fills the gap with zeros. Incomplete bit groups are padded on the right in the preview. Changing dimensions or colour depth reinterprets the row-major bit stream and truncates it if the new capacity is smaller. Labels appear only when cells are large enough; zoom in to read them.
