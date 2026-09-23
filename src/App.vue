@@ -13,7 +13,7 @@
       <fieldset class="settings"><legend>Grid</legend>
         <label>Width <select :value="xRes" @change="resize($event, 'width')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
         <label>Height <select :value="yRes" @change="resize($event, 'height')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
-        <label>Colour Depth <select :value="colourDepth" @change="changeDepth"><option v-for="n in 5" :key="n">{{ n }}</option></select></label>
+        <label>Colour Depth <select :value="colourDepth" @change="changeDepth"><option v-for="n in 6" :key="n">{{ n }}</option></select></label>
         <label v-if="colourDepth >= 3">Colour palette <select :value="paletteChoice" @change="checkpoint(); paletteChoice = $event.target.value"><option value="default">Rainbow</option><option value="grayscale">Grayscale</option><option value="rgb">RGB</option><option value="custom">Custom</option></select></label>
       </fieldset>
       <fieldset class="palette-group"><legend>Palette</legend><div class="palette">
@@ -52,7 +52,7 @@
 <script>
 import ToggleSwitch from './components/ToggleSwitch.vue';
 import { validateProject, resizeBits, bmpBytes } from './project.mjs';
-const initialCustom = ['#000000','#0000ff','#00ff00','#00ffff','#ff0000','#ff00ff','#ffff00','#ffffff', ...Array.from({length:24},(_,i)=>{const v=Math.round((i+1)*255/24).toString(16).padStart(2,'0');return `#${v}${v}${v}`;})];
+const initialCustom = ['#000000','#0000ff','#00ff00','#00ffff','#ff0000','#ff00ff','#ffff00','#ffffff', ...Array.from({length:56},(_,i)=>{const v=Math.round((i+1)*255/56).toString(16).padStart(2,'0');return `#${v}${v}${v}`;})];
 export default {
   components: { ToggleSwitch },
   data() {
@@ -265,7 +265,7 @@ h1 { margin: 0 0 24px; font-size: 32px; } label { font-size: 14px; } select { pa
 .control-group legend, .settings legend, .palette-group legend { padding: 0 6px; font-size: 12px; color: #53616d; }
 .group-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .settings { display: flex; flex-wrap: wrap; gap: 12px; }
-.hint { font-size: 12px; line-height: 1.6; color: #53616d; } .palette { margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.hint { font-size: 12px; line-height: 1.6; color: #53616d; } .palette { max-height: 420px; overflow-y: auto; margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 2px; }
 .palette-entry { display: grid; gap: 6px; } .swatch { min-height: 46px; border: 2px solid #89929b; border-radius: 7px; cursor: pointer; font-family: inherit; }
 .swatch.selected { outline: 3px solid #2469b2; outline-offset: 2px; } .palette input { width: 100%; height: 30px; }
 .data-label { display: block; margin-bottom: 8px; } textarea { width: 100%; resize: vertical; font-family: inherit; padding: 10px; overflow-wrap: anywhere; }
