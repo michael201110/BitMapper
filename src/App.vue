@@ -23,13 +23,13 @@
       <p class="warning" role="status">{{ warning }}</p>
       <p class="hint">Empty pixels use {{ pattern(0) }}. Incomplete bit groups are padded with zeros in the preview. Painting fills preceding empty pixels with zeros.</p>
     </section>
-    <section class="editor">
+    <section ref="editor" class="editor">
       <div class="display-controls">
         <ToggleSwitch labelText="Labels" leftText="Show" rightText="Hide" v-model:state="showLabels" />
         <ToggleSwitch labelText="Grid Lines" leftText="Show" rightText="Hide" v-model:state="showGridlines" />
         <label>Zoom <select v-model.number="zoom"><option :value="1">Fit</option><option :value="2">2×</option><option :value="4">4×</option><option :value="8">8×</option></select></label>
       </div>
-      <div ref="viewport" class="viewport">
+      <div class="viewport" :style="{ width: canvasWidth + 'px' }">
         <canvas ref="canvas" :style="{width: canvasWidth + 'px', height: canvasHeight + 'px'}" tabindex="0" role="img" :aria-label="'Editable ' + xRes + ' by ' + yRes + ' pixel grid. Arrow keys move; Space or Enter paints.'" @pointerdown="startPaint" @pointermove="movePaint" @pointerup="stopPaint" @pointercancel="stopPaint" @lostpointercapture="stopPaint" @keydown="keyPaint" @focus="focused = true; draw()" @blur="focused = false; draw()"></canvas>
       </div>
       <p class="hint">{{ xRes }} × {{ yRes }} pixels · Zoom in for precise editing. Labels appear when pixels are large enough.</p>
@@ -75,7 +75,7 @@ export default {
   },
   mounted() {
     this.observer = new ResizeObserver(([entry]) => { this.available = Math.max(1, entry.contentRect.width); });
-    this.observer.observe(this.$refs.viewport);
+    this.observer.observe(this.$refs.editor);
     this.draw();
   },
   beforeUnmount() { this.observer.disconnect(); cancelAnimationFrame(this.frame); },
@@ -174,7 +174,7 @@ h1 { margin: 0 0 24px; font-size: 32px; } h2 { margin-top: 24px; font-size: 17px
 .data-label { display: block; margin-bottom: 8px; } textarea { width: 100%; resize: vertical; font-family: inherit; padding: 10px; overflow-wrap: anywhere; }
 .warning { color: #a12c14; font-size: 12px; min-height: 16px; } .editor { min-width: 0; }
 .display-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 20px; }
-.viewport { width: 100%; overflow: auto; max-height: 650px; background: #cdd2d8; }
+.viewport { max-width: 100%; overflow: auto; max-height: 650px; background: #cdd2d8; }
 canvas { display: block; touch-action: none; cursor: crosshair; } canvas:focus-visible { outline: 2px solid #2469b2; outline-offset: -2px; }
 .signature { text-align: right; font-size: 12px; margin-top: 24px; }
 @media (max-width: 760px) { .app { grid-template-columns: 1fr; padding: 18px; margin: 12px; gap: 20px; } .viewport { max-height: 65vh; } }
