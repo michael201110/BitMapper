@@ -4,8 +4,10 @@
       <h1>BitMapper</h1>
       <div class="toolbar">
         <button @click="undo" :disabled="!past.length">Undo</button><button @click="redo" :disabled="!future.length">Redo</button><button @click="clearGrid">Clear</button>
-        <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Open project</button><button @click="$refs.image.click()">Import image</button>
-        <button @click="exportPNG">PNG</button><button @click="exportBMP">BMP</button>
+        <div class="file-row">
+          <button @click="saveProject">Save project</button><button @click="$refs.file.click()">Import</button><button @click="$refs.image.click()">Import image</button>
+          <details class="export-menu"><summary>Export</summary><div class="export-options"><button @click="exportPNG">PNG</button><button @click="exportBMP">BMP</button></div></details>
+        </div>
         <input ref="file" type="file" accept=".bitmapper,.json" hidden @change="openProject" />
         <input ref="image" type="file" accept="image/*" hidden @change="importImage" />
       </div>
@@ -257,7 +259,14 @@ h1 { margin: 0 0 24px; font-size: 32px; } h2 { margin-top: 24px; font-size: 17px
 canvas { display: block; touch-action: none; cursor: crosshair; } canvas:focus-visible { outline: 2px solid #2469b2; outline-offset: -2px; }
 .signature { text-align: right; font-size: 12px; margin-top: 24px; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-.toolbar button, .inspector button { font: inherit; font-size: 12px; border: 1px solid #a3aeb8; background: #fff; border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+.toolbar button, .inspector button, .export-menu summary { font: inherit; font-size: 12px; border: 1px solid #a3aeb8; background: #fff; border-radius: 5px; padding: 7px 10px; cursor: pointer; }
+.file-row { flex-basis: 100%; display: flex; align-items: flex-start; gap: 8px; }
+.export-menu { position: relative; }
+.export-menu summary { list-style: none; }
+.export-menu summary::-webkit-details-marker { display: none; }
+.export-menu summary::after { content: ' ▾'; }
+.export-options { position: absolute; z-index: 2; display: grid; gap: 4px; min-width: 100%; padding-top: 4px; }
+.export-options button { width: 100%; }
 button:disabled { opacity: 0.4; cursor: default; }
 .inspector { margin-top: 10px; font-size: 12px; line-height: 2; }
 .inspector mark { background: #c7e8ff; padding: 3px; }
