@@ -6,7 +6,7 @@ BitMapper is a small Vue app for visualizing binary data as a pixel grid. Choose
 
 - Independent width and height: 4, 5, 6, 7, 8, 16, 32, 64, or 128 pixels
 - 1-bit through 5-bit color depths (2 to 32 palette entries)
-- Rainbow, grayscale, 3-bit RGB, and custom palettes
+- Rainbow, grayscale, RGB, and custom palettes
 - Optional pixel labels and grid lines
 - Custom colors for every palette entry, including 16- and 32-colour modes
 - Click or drag to paint with any palette colour; binary data stays in sync
@@ -48,7 +48,7 @@ For example, a `4x4` grid at 2-bit color depth accepts up to 32 bits.
 - **1-bit:** black and white
 - **2-bit:** black, red, gold, and white
 - **3-bit Rainbow:** eight colors arranged from black through the spectrum to white
-- **3-bit RGB:** the eight combinations of red, green, and blue
+- **RGB:** indexed red, green, and blue palettes at 3, 4, and 5 bits (8, 16, or 32 colours)
 - **4-bit and 5-bit Rainbow:** 16 or 32 evenly spaced spectrum colours
 - **Grayscale:** evenly spaced black-to-white entries at any depth
 - **Custom:** choose each palette colour with the colour pickers
