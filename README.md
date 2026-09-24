@@ -4,6 +4,10 @@ BitMapper is a small Vue app for visualizing binary data as a pixel grid. Choose
 
 ## Features
 
+- Full RGB mode: 24-bit pixels with 8 bits each for red, green and blue, a colour picker, and an eyedropper
+- Full RGB imports preserve sampled image colours; PNG/BMP exports and editable projects support full colour
+- Switching from indexed to Full RGB preserves colours; switching back matches the nearest palette colour after confirmation
+
 - Independent width and height: 4, 5, 6, 7, 8, 16, 32, 64, or 128 pixels
 - 1-bit through 6-bit color depths (2 to 64 palette entries)
 - Rainbow, grayscale, RGB, and custom palettes

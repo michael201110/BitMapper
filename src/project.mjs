@@ -1,6 +1,6 @@
 export const resolutions = [4,5,6,7,8,16,32,64,128];
 export function validateProject(p) {
-  if (!p || p.format !== 'BitMapper' || p.version !== 1 || !resolutions.includes(p.width) || !resolutions.includes(p.height) || ![1,2,3,4,5,6].includes(p.depth) || !['default','grayscale','rgb','custom'].includes(p.palette) || !Array.isArray(p.custom) || p.custom.length < 8 || p.custom.length > 64 || !p.custom.every(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) || typeof p.bits !== 'string' || !/^[01]*$/.test(p.bits) || p.bits.length > p.width*p.height*p.depth) throw new Error('Invalid BitMapper project file.');
+  if (!p || p.format !== 'BitMapper' || p.version !== 1 || !resolutions.includes(p.width) || !resolutions.includes(p.height) || ![1,2,3,4,5,6,24].includes(p.depth) || !['default','grayscale','rgb','custom'].includes(p.palette) || !Array.isArray(p.custom) || p.custom.length < 8 || p.custom.length > 64 || !p.custom.every(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)) || typeof p.bits !== 'string' || !/^[01]*$/.test(p.bits) || p.bits.length > p.width*p.height*p.depth) throw new Error('Invalid BitMapper project file.');
   const custom=[...p.custom];
   while(custom.length < 64) custom.push('#000000');
   return {format:'BitMapper',version:1,width:p.width,height:p.height,depth:p.depth,palette:p.palette,custom,bits:p.bits};

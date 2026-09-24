@@ -13,10 +13,10 @@
       <fieldset class="settings"><legend>Grid</legend>
         <label>Width <select :value="xRes" @change="resize($event, 'width')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
         <label>Height <select :value="yRes" @change="resize($event, 'height')"><option v-for="r in resolutions" :key="r">{{ r }}</option></select></label>
-        <label>Colour Depth <select :value="colourDepth" @change="changeDepth"><option v-for="n in 6" :key="n">{{ n }}</option></select></label>
-        <label v-if="colourDepth >= 3">Colour palette <select :value="paletteChoice" @change="checkpoint(); paletteChoice = $event.target.value"><option value="default">Rainbow</option><option value="grayscale">Grayscale</option><option value="rgb">RGB</option><option value="custom">Custom</option></select></label>
+        <label>Colour Depth <select :value="colourDepth" @change="changeDepth"><option v-for="n in 6" :key="n" :value="n">{{ n }}-bit indexed</option><option :value="24">Full RGB (24-bit)</option></select></label>
+        <label v-if="colourDepth >= 3 && colourDepth !== 24">Colour palette <select :value="paletteChoice" @change="checkpoint(); paletteChoice = $event.target.value"><option value="default">Rainbow</option><option value="grayscale">Grayscale</option><option value="rgb">RGB</option><option value="custom">Custom</option></select></label>
       </fieldset>
-      <fieldset class="palette-group"><legend>Palette</legend><div class="palette">
+      <fieldset v-if="colourDepth === 24" class="palette-group"><legend>Paint colour</legend><input aria-label="Paint colour" type="color" v-model="paintColour" /> <span>{{ paintColour }}</span></fieldset><fieldset v-else class="palette-group"><legend>Palette</legend><div class="palette">
         <div v-for="(colour, i) in palette" :key="i" class="palette-entry">
           <button class="swatch" :class="{selected: selected === i}" :aria-label="'Paint ' + pattern(i)" :aria-pressed="selected === i" :style="{background: colour, color: contrast(colour)}" @click="selected = i">{{ pattern(i) }}</button>
           <input v-if="colourDepth >= 3 && paletteChoice === 'custom'" type="color" :aria-label="'Colour for ' + pattern(i)" :value="custom[i]" @change="checkpoint(); custom[i] = $event.target.value" />
@@ -32,12 +32,12 @@
         <ToggleSwitch labelText="Labels" leftText="Show" rightText="Hide" v-model:state="showLabels" />
         <ToggleSwitch labelText="Grid Lines" leftText="Show" rightText="Hide" v-model:state="showGridlines" />
         <label>Zoom <select v-model.number="zoom"><option :value="1">Fit</option><option :value="2">2×</option><option :value="4">4×</option><option :value="8">8×</option></select></label>
-        <label>Tool <select v-model="tool"><option value="paint">Paint</option><option value="inspect">Inspect</option></select></label>
+        <label>Tool <select v-model="tool"><option value="paint">Paint</option><option value="inspect">Inspect</option><option value="eyedropper">Eyedropper</option></select></label>
         <label><input type="checkbox" v-model="learn" /> Learn</label>
       </div>
       <div v-if="learn" class="learn-panel">
         <strong>{{ xRes }} × {{ yRes }} = {{ xRes * yRes }} pixels</strong>
-        <span>{{ colourDepth }} bits/pixel · {{ 2 ** colourDepth }} colours</span>
+        <span v-if="colourDepth === 24">8 bits each for red, green and blue (0–255 per channel)</span><span>{{ colourDepth }} bits/pixel · {{ 2 ** colourDepth }} colours</span>
         <span>{{ xRes * yRes }} × {{ colourDepth }} = {{ capacity.toLocaleString() }} bits = {{ capacity / 8 }} bytes</span>
         <small>Pixel data only; whole-byte storage: {{ Math.ceil(capacity / 8).toLocaleString() }} bytes. File headers and palettes add overhead.</small>
       </div>
@@ -58,7 +58,7 @@ export default {
   data() {
     return {
       resolutions: [4, 5, 6, 7, 8, 16, 32, 64, 128], xRes: 4, yRes: 4,
-      colourDepth: 1, paletteChoice: 'default', selected: 1, data: '', warning: '',
+      colourDepth: 1, paletteChoice: 'default', selected: 1, paintColour: '#ffffff', data: '', warning: '',
       custom: [...initialCustom],
       showLabels: true, showGridlines: true, zoom: 1, available: 560,
       painting: false, lastPixel: null, cursor: 0, focused: false,
@@ -68,6 +68,7 @@ export default {
   computed: {
     capacity() { return this.xRes * this.yRes * this.colourDepth; },
     palette() {
+      if (this.colourDepth === 24) return [];
       if (this.colourDepth === 1) return ['#000000','#ffffff'];
       if (this.colourDepth === 2) return ['#000000','#ff0000','#ffd700','#ffffff'];
       const count = 2 ** this.colourDepth;
@@ -97,6 +98,8 @@ export default {
   },
   beforeUnmount() { this.observer.disconnect(); cancelAnimationFrame(this.frame); window.removeEventListener('keydown', this.historyKey); },
   methods: {
+    colourAt(index) { return this.colourDepth === 24 ? '#' + this.valueAt(index).toString(16).padStart(6,'0') : this.palette[this.valueAt(index)]; },
+    pickColour(index) { this.cursor=index; this.hasSelection=true; if(this.colourDepth===24) this.paintColour=this.colourAt(index); else this.selected=this.valueAt(index); this.tool='paint'; this.highlightBits(); this.draw(); },
     hslToHex(h, s, l) { const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2, [r,g,b]=h<60?[c,x,0]:h<120?[x,c,0]:h<180?[0,c,x]:h<240?[0,x,c]:h<300?[x,0,c]:[c,0,x]; return `#${[r,g,b].map(v=>Math.round((v+m)*255).toString(16).padStart(2,'0')).join('')}`; },
     rgbPalette(count) {
       const depth=Math.log2(count), redBits=Math.ceil(depth/3), greenBits=Math.floor((depth+1)/3), blueBits=Math.floor(depth/3);
@@ -121,6 +124,13 @@ export default {
     },
     changeDepth(event) {
       const depth=Number(event.target.value), limit=2**depth;
+      if(depth===24 || this.colourDepth===24) {
+        if(depth!==24 && !window.confirm('Convert to an indexed palette? Colours will be matched to the nearest palette entry. You can undo this.')) { event.target.value=this.colourDepth; return; }
+        const colours=Array.from({length:this.xRes*this.yRes},(_,i)=>this.colourAt(i));
+        this.checkpoint(); this.colourDepth=depth;
+        this.data=colours.map(hex=>this.closestPaletteValue(parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)).toString(2).padStart(depth,'0')).join('');
+        this.hasSelection=false; return;
+      }
       const values=Array.from({length:this.xRes*this.yRes},(_,i)=>this.valueAt(i));
       if(values.some(v=>v>=limit) && !window.confirm('Some colours cannot fit this depth and will become colour 0. Continue? You can undo this.')) { event.target.value=this.colourDepth; return; }
       this.checkpoint(); this.colourDepth=depth; this.data=values.map(v=>(v<limit?v:0).toString(2).padStart(depth,'0')).join(''); this.hasSelection=false;
@@ -137,7 +147,7 @@ export default {
       finally { event.target.value=''; }
     },
     async openProjectFile(file) {
-      try { if(file.size>200000) throw new Error('Project file is too large.'); const p=validateProject(JSON.parse(await file.text())); if(this.data && !window.confirm('Replace this bitmap with the opened project? You can undo this.')) return; this.checkpoint(); this.restore(p); }
+      try { if(file.size>1000000) throw new Error('Project file is too large.'); const p=validateProject(JSON.parse(await file.text())); if(this.data && !window.confirm('Replace this bitmap with the opened project? You can undo this.')) return; this.checkpoint(); this.restore(p); }
       catch(error) { this.warning=error instanceof SyntaxError?'Invalid BitMapper project file.':error.message; }
     },
     async importImageFile(file) {
@@ -158,16 +168,17 @@ export default {
       } catch(error) { this.warning=error.message || 'Could not import that image.'; }
     },
     closestPaletteValue(red,green,blue) {
+      if(this.colourDepth === 24) return red * 65536 + green * 256 + blue;
       let closest=0, distance=Infinity;
       this.palette.forEach((hex,index)=>{ const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16); const d=(red-r)**2+(green-g)**2+(blue-b)**2; if(d<distance){distance=d;closest=index;} });
       return closest;
     },
     exportPNG() {
       const canvas=document.createElement('canvas'); canvas.width=this.xRes; canvas.height=this.yRes; const ctx=canvas.getContext('2d');
-      for(let i=0;i<this.xRes*this.yRes;i++) { ctx.fillStyle=this.palette[this.valueAt(i)]; ctx.fillRect(i%this.xRes,Math.floor(i/this.xRes),1,1); }
+      for(let i=0;i<this.xRes*this.yRes;i++) { ctx.fillStyle=this.colourAt(i); ctx.fillRect(i%this.xRes,Math.floor(i/this.xRes),1,1); }
       canvas.toBlob(blob=>{ if(blob) this.download(blob,'.png'); },'image/png');
     },
-    exportBMP() { const colours=Array.from({length:this.xRes*this.yRes},(_,i)=>this.palette[this.valueAt(i)]); this.download(new Blob([bmpBytes(this.xRes,this.yRes,colours)],{type:'image/bmp'}),'.bmp'); },
+    exportBMP() { const colours=Array.from({length:this.xRes*this.yRes},(_,i)=>this.colourAt(i)); this.download(new Blob([bmpBytes(this.xRes,this.yRes,colours)],{type:'image/bmp'}),'.bmp'); },
     pattern(value) { return value.toString(2).padStart(this.colourDepth, '0'); },
     valueAt(index) { return parseInt(this.data.slice(index * this.colourDepth, (index + 1) * this.colourDepth).padEnd(this.colourDepth, '0'), 2); },
     contrast(hex) { return (parseInt(hex.slice(1,3),16)*299 + parseInt(hex.slice(3,5),16)*587 + parseInt(hex.slice(5,7),16)*114) / 1000 > 150 ? '#17202b' : '#ffffff'; },
@@ -186,13 +197,14 @@ export default {
     paint(index) {
       const start = index * this.colourDepth;
       const padded = this.data.padEnd(start + this.colourDepth, '0');
-      this.data = padded.slice(0, start) + this.pattern(this.selected) + padded.slice(start + this.colourDepth);
+      this.data = padded.slice(0, start) + this.pattern(this.colourDepth === 24 ? parseInt(this.paintColour.slice(1),16) : this.selected) + padded.slice(start + this.colourDepth);
       this.cursor = index; this.warning = ''; this.draw();
       this.hasSelection=true; this.highlightBits();
     },
     startPaint(event) {
       if (event.button !== 0) return;
       const pixel=this.pixelAt(event); if(pixel===null) return;
+      if(this.tool==='eyedropper') { this.pickColour(pixel); return; }
       if(this.tool==='inspect') { this.cursor=pixel; this.hasSelection=true; this.highlightBits(true); this.draw(); return; }
       this.checkpoint();
       this.$refs.canvas.focus(); this.$refs.canvas.setPointerCapture(event.pointerId);
@@ -219,7 +231,7 @@ export default {
       if (event.key === 'ArrowRight' && x < this.xRes - 1) this.cursor++;
       if (event.key === 'ArrowUp' && y > 0) this.cursor -= this.xRes;
       if (event.key === 'ArrowDown' && y < this.yRes - 1) this.cursor += this.xRes;
-      if (event.key === ' ' || event.key === 'Enter') { if(this.tool==='paint') { this.checkpoint(); this.paint(this.cursor); } }
+      if (event.key === ' ' || event.key === 'Enter') { if(this.tool==='paint') { this.checkpoint(); this.paint(this.cursor); } else if(this.tool==='eyedropper') this.pickColour(this.cursor); }
       this.hasSelection=true; this.highlightBits();
       this.draw();
     },
@@ -234,9 +246,9 @@ export default {
       const ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
       for (let i = 0; i < this.xRes * this.yRes; i++) {
         const x = i % this.xRes * size, y = Math.floor(i / this.xRes) * size;
-        const value = this.valueAt(i), colour = this.palette[value];
+        const value = this.valueAt(i), colour = this.colourAt(i);
         ctx.fillStyle = colour; ctx.fillRect(x, y, size + 0.5, size + 0.5);
-        if (this.showLabels && size >= (this.colourDepth === 3 ? 30 : 22)) {
+        if (this.showLabels && size >= (this.colourDepth === 24 ? 190 : Math.max(22,this.colourDepth * 8))) {
           ctx.fillStyle = this.contrast(colour); ctx.font = '12px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(this.pattern(value), x + size / 2, y + size / 2);
         }

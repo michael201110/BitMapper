@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {resizeBits,validateProject,bmpBytes} from '../src/project.mjs';
+test('full RGB projects preserve all channels at maximum resolution',()=>{
+ const bits='000100100011010001010110'.repeat(128*128);
+ const project={format:'BitMapper',version:1,width:128,height:128,depth:24,palette:'rgb',custom:Array(64).fill('#000000'),bits};
+ assert.deepEqual(validateProject(JSON.parse(JSON.stringify(project))),project);
+ assert.equal(bits.length,393216);
+ assert.equal(resizeBits('111111110000000000000000000000000000000011111111',2,1,3,1,24),'111111110000000000000000000000000000000011111111'+'0'.repeat(24));
+});
 test('resizing preserves row and column positions',()=>{
  assert.equal(resizeBits('10010110',4,2,5,3,1),'100100110000000');
  assert.equal(resizeBits('000001010011100101110111',4,2,2,2,3),'000001100101');
