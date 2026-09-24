@@ -44,7 +44,7 @@
       <div class="viewport" :class="{ zoomed: zoom > 1 }" :style="{ width: canvasWidth + 'px' }">
         <canvas ref="canvas" :style="{width: canvasWidth + 'px', height: canvasHeight + 'px'}" tabindex="0" role="img" :aria-label="'Editable ' + xRes + ' by ' + yRes + ' pixel grid. Arrow keys move; Space or Enter paints.'" @pointerdown="startPaint" @pointermove="movePaint" @pointerup="stopPaint" @pointercancel="stopPaint" @lostpointercapture="stopPaint" @keydown="keyPaint" @focus="focused = true; draw()" @blur="focused = false; draw()"></canvas>
       </div>
-      <p class="signature">Version 2.1 by michael201110</p>
+      <p class="signature">Version 2.2 by michael201110</p>
     </section>
   </main>
 </template>
