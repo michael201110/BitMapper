@@ -57,7 +57,7 @@ export default {
   components: { ToggleSwitch },
   data() {
     return {
-      resolutions: [4, 5, 6, 7, 8, 16, 32, 64, 128], xRes: 4, yRes: 4,
+      resolutions: [4, 5, 6, 7, 8, 16, 32, 64, 128, 256], xRes: 4, yRes: 4,
       colourDepth: 1, paletteChoice: 'default', selected: 1, paintColour: '#ffffff', data: '', warning: '',
       custom: [...initialCustom],
       showLabels: true, showGridlines: true, zoom: 1, available: 560,
